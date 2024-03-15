@@ -1,83 +1,84 @@
-local gizmo = require(game:GetService('ReplicatedStorage').Shared.gizmo)
-
 local RS = game:GetService('RunService')
 local TS = game:GetService('TweenService')
 local UIS = game:GetService('UserInputService')
 local CAS = game:GetService('ContextActionService')
 
-local camera = game.Workspace.CurrentCamera
-local character = game.Workspace:WaitForChild(game.Players.LocalPlayer.Name)
-local hrp: Part = character:WaitForChild('HumanoidRootPart')
+local Module = {}
 
 
-local xAxis = 0
-local yAxis = 0
+local Configuration = {
+    TargetCameraOffset = Vector3.new(2,2,8);
+    CameraSmoothness = 10;
+    VerticalMultiplyer = .5;
+    HorizontalMultiplyer = 1;
+    MaxVerticalAngle = 75
+}
 
-local xValue = Instance.new('NumberValue')
-local yValue = Instance.new('NumberValue')
+local _InternalProperties = {
+    CameraRotationCFrame = CFrame.identity;
+    SmoothedInput = {X = Instance.new('NumberValue'), Y = Instance.new('NumberValue')};
+    RawInput = {X = 0, Y = 0};
+    CurrentCameraMode = '';
+}
 
-local targetCameraOffset = Vector3.new(2,2,8)
-
-local cameraRotationCFrame = CFrame.new(hrp.CFrame.Position)
-
-local mostRecentCameraOffset = targetCameraOffset
-local currentCameraOffset = Instance.new('Vector3Value')
-local yRotationMultiplier = .4
-local cameraSmoothnessMultiplier = 20
-
-local function CustomCamera(_, inputState, inputObject)
-    if inputState == Enum.UserInputState.Change then
-        xAxis -= inputObject.Delta.X
-        yAxis = math.clamp(yAxis - inputObject.Delta.Y * yRotationMultiplier, -75, 75)
+function Module:SetCameraType(input: string)
+    local currentMode = _InternalProperties.CurrentCameraMode
+    if input == currentMode then
+        warn('Camera is already on ' .. input .. ' mode.')
+        return
     end
-end
 
+    if input == 'Default' then
+        StartDefaultCamera()
+    elseif input == 'Survivor' then
+        StartSurvivorCamera()
 
-local function RenderCamera(deltaTime)
-    local rootPosition = hrp.CFrame.Position
+    elseif input == 'Killer' then
+        warn('Work in progress!')
 
-    cameraRotationCFrame = CFrame.new(rootPosition) * CFrame.Angles(0, math.rad(xValue.Value), 0) * CFrame.Angles(math.rad(yValue.Value), 0, 0)
-    mostRecentCameraOffset = CameraOffsetRaycast()
-
-    TS:Create(xValue,
-    TweenInfo.new(deltaTime * cameraSmoothnessMultiplier, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0),
-    {Value = xAxis})
-    :Play()
-
-    TS:Create(yValue,
-    TweenInfo.new(deltaTime * cameraSmoothnessMultiplier, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0),
-    {Value = yAxis})
-    :Play()
-
-    TS:Create(currentCameraOffset,
-    TweenInfo.new(deltaTime, Enum.EasingStyle.Quint, Enum.EasingDirection.In, 0, false, 0),
-    {Value = mostRecentCameraOffset})
-    :Play()
-
-    local finalCameraCFrame = cameraRotationCFrame * CFrame.new(mostRecentCameraOffset--[[currentCameraOffset.Value]])
-    camera.CFrame = finalCameraCFrame
-end
-
-
-local function FocusCamera(_, inputState, _)
-    if inputState == Enum.UserInputState.Begin then
-        camera.CameraType = Enum.CameraType.Scriptable
-        UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
-
-        CAS:UnbindAction('Focus')
+    else
+        warn('Invalid Input: ' .. input)
+        return
     end
+
+    _InternalProperties.CurrentCameraMode = input
 end
 
-CAS:BindAction('Focus', FocusCamera, false, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch, Enum.UserInputType.Focus)
+function StartDefaultCamera()
+    local camera = workspace.CurrentCamera
 
-CAS:BindAction('Camera', CustomCamera, false, Enum.UserInputType.MouseMovement)
+    camera.CameraType = Enum.CameraType.Custom
+    UIS.MouseBehavior = Enum.MouseBehavior.Default
+end
 
-RS:BindToRenderStep('CameraMovement', Enum.RenderPriority.Camera.Value, RenderCamera)
+function StartSurvivorCamera()
+    local camera = workspace.CurrentCamera
+
+    CAS:BindAction('CameraInput', CaptureCameraInput, false, Enum.UserInputType.MouseMovement)
+    RS:BindToRenderStep('RenderCamera', Enum.RenderPriority.Camera.Value + 1, RenderCamera)
+
+    camera.CameraType = Enum.CameraType.Scriptable
+    UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+end
+
+function Module:DisableSurvivorCamera()
+    local camera = workspace.CurrentCamera
+
+    CAS:UnbindAction('CameraInput')
+    RS:UnbindFromRenderStep('RenderCamera')
+    camera.CameraType = Enum.CameraType.Scriptable
+    UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+end
 
 function CameraOffsetRaycast() : Vector3
-    local computedVector = Vector3.zero
+    local character = workspace:WaitForChild(game.Players.LocalPlayer.Name)
+    local hrp = character:WaitForChild('HumanoidRootPart')
+    local camera = workspace.CurrentCamera
 
-    local cameraLookVector = cameraRotationCFrame.LookVector
+    local computedVector = Vector3.zero
+    local targetCameraOffset = Configuration.TargetCameraOffset
+
+    local cameraLookVector = _InternalProperties.CameraRotationCFrame.LookVector
     local raycastOrigin = hrp.CFrame.Position --+ (cameraLookVector:Cross(Vector3.new(0,1,0)) * .21)
     local rcp = RaycastParams.new()
     rcp.FilterType = Enum.RaycastFilterType.Exclude
@@ -122,12 +123,10 @@ function CameraOffsetRaycast() : Vector3
 
     local rightClipResult = workspace:Raycast(hrp.CFrame.Position, rightLookVector * rightDistance, rcp)
     if rightClipResult then
-        print('Right')
+
         local clipDistance = (raycastOriginPostBack - rightClipResult.Position).Magnitude
         --gizmo.drawArrow(raycastOriginPostBack, rightClipResult.Position)
-        local yOffset = computedVector.X - clipDistance
-        local zOffset = computedVector.Z - (.1/clipDistance)
-        computedVector = Vector3.new(yOffset, computedVector.Y, zOffset)
+        computedVector = Vector3.new((computedVector.X - clipDistance), computedVector.Y, computedVector.Z)
 
         return computedVector
     end
@@ -139,7 +138,7 @@ function CameraOffsetRaycast() : Vector3
 
     local leftClipResult = workspace:Raycast(hrp.CFrame.Position, leftLookVector * leftDistance, rcp)
     if leftClipResult then
-        print('Left')
+
         local clipDistance = (raycastOriginPostBack - leftClipResult.Position).Magnitude
         computedVector = Vector3.new((computedVector.X + clipDistance), computedVector.Y, computedVector.Z)
 
@@ -149,3 +148,34 @@ function CameraOffsetRaycast() : Vector3
 
     return computedVector
 end
+
+function RenderCamera(deltaTime)
+    local humanoidRootPart = workspace:WaitForChild(game.Players.LocalPlayer.Name):WaitForChild('HumanoidRootPart')
+    local camera = workspace.CurrentCamera
+    local rootPosition = humanoidRootPart.CFrame.Position
+
+    _InternalProperties.CameraRotationCFrame = CFrame.new(rootPosition) * CFrame.Angles(0, math.rad(xValue.Value), 0) * CFrame.Angles(math.rad(yValue.Value), 0, 0)
+    local newCameraOffset = CameraOffsetRaycast()
+
+    TS:Create(_InternalProperties.SmoothedInput.X,
+    TweenInfo.new(deltaTime * Configuration.CameraSmoothness, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0),
+    {Value = _InternalProperties.RawInput.X})
+    :Play()
+
+    TS:Create(_InternalProperties.SmoothedInput.Y,
+    TweenInfo.new(deltaTime * Configuration.CameraSmoothness, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0),
+    {Value = _InternalProperties.RawInput.Y})
+    :Play()
+
+    local finalCameraCFrame = _InternalProperties.CameraRotationCFrame * CFrame.new(newCameraOffset)
+    camera.CFrame = finalCameraCFrame
+end
+
+function CaptureCameraInput(_, inputState, inputObject)
+    if inputState == Enum.UserInputState.Change then
+        _InternalProperties.RawInput.X = _InternalProperties.RawInput.X - inputObject.Delta.X
+        _InternalProperties.RawInput.Y = math.clamp(_InternalProperties.RawInput.Y - inputObject.Delta.Y * Configuration.VerticalMultiplyer, -Configuration.MaxVerticalAngle, Configuration.MaxVerticalAngle)
+    end
+end
+
+return Module

@@ -1,3 +1,57 @@
+local _CameraFolder = workspace:WaitForChild('ModelCamera')
+local CameraRotationPart = _CameraFolder:WaitForChild('CameraRotation')
+local FakeHrp = _CameraFolder:WaitForChild('HumanoidRootPart')
+
+local ConfigUI = game.Players.LocalPlayer.PlayerGui:WaitForChild('Config'):WaitForChild('Background')
+local _XLabel: TextLabel = ConfigUI:WaitForChild('XLabel')
+local _YLabel: TextLabel = ConfigUI:WaitForChild('YLabel')
+
+local scale = 5
+local xAxis = 0
+local yAxis = 0
+
+ConfigUI:WaitForChild('XPlus').MouseButton1Click:Connect(function()
+    print(123)
+    local newNumber = math.clamp(xAxis + scale, -90, 90)
+    xAxis = newNumber
+    _XLabel.Text = 'X-Axis: ' .. newNumber
+end)
+
+ConfigUI:WaitForChild('XMinus').MouseButton1Click:Connect(function()
+    local newNumber = math.clamp(xAxis - scale, -90, 90)
+    xAxis = newNumber
+    _XLabel.Text = 'X-Axis: ' .. newNumber
+end)
+
+ConfigUI:WaitForChild('YPlus').MouseButton1Click:Connect(function()
+    local newNumber = math.clamp(yAxis + scale, -90, 90)
+    yAxis = newNumber
+    _YLabel.Text = 'Y-Axis: ' .. newNumber
+end)
+
+ConfigUI:WaitForChild('YMinus').MouseButton1Click:Connect(function()
+    local newNumber = math.clamp(yAxis - scale, -90, 90)
+    yAxis = newNumber
+    _YLabel.Text = 'Y-Axis: ' .. newNumber
+end)
+
+ConfigUI:WaitForChild('Reset').MouseButton1Click:Connect(function()
+    _YLabel.Text = 'Y-Axis: 0'
+    _XLabel.Text = 'X-Axis: 0'
+    xAxis = 0
+    yAxis = 0
+end)
+
+local _Scale = ConfigUI:WaitForChild('Scale')
+_Scale.FocusLost:Connect(function()
+    local input = tonumber(_Scale.Text)
+    if input then
+        scale = input
+    end
+end)
+
+
+
 local gizmo = require(game:GetService('ReplicatedStorage').Shared.gizmo)
 
 local RS = game:GetService('RunService')
@@ -10,11 +64,10 @@ local character = game.Workspace:WaitForChild(game.Players.LocalPlayer.Name)
 local hrp: Part = character:WaitForChild('HumanoidRootPart')
 
 
-local xAxis = 0
-local yAxis = 0
 
-local xValue = Instance.new('NumberValue')
-local yValue = Instance.new('NumberValue')
+
+
+
 
 local targetCameraOffset = Vector3.new(2,2,8)
 
@@ -25,63 +78,39 @@ local currentCameraOffset = Instance.new('Vector3Value')
 local yRotationMultiplier = .4
 local cameraSmoothnessMultiplier = 20
 
-local function CustomCamera(_, inputState, inputObject)
-    if inputState == Enum.UserInputState.Change then
-        xAxis -= inputObject.Delta.X
-        yAxis = math.clamp(yAxis - inputObject.Delta.Y * yRotationMultiplier, -75, 75)
-    end
-end
+
 
 
 local function RenderCamera(deltaTime)
     local rootPosition = hrp.CFrame.Position
 
-    cameraRotationCFrame = CFrame.new(rootPosition) * CFrame.Angles(0, math.rad(xValue.Value), 0) * CFrame.Angles(math.rad(yValue.Value), 0, 0)
+    cameraRotationCFrame = CFrame.new(rootPosition) * CFrame.Angles(0, math.rad(xAxis), 0) * CFrame.Angles(math.rad(yAxis), 0, 0)
     mostRecentCameraOffset = CameraOffsetRaycast()
 
-    TS:Create(xValue,
-    TweenInfo.new(deltaTime * cameraSmoothnessMultiplier, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0),
-    {Value = xAxis})
-    :Play()
-
-    TS:Create(yValue,
-    TweenInfo.new(deltaTime * cameraSmoothnessMultiplier, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, 0, false, 0),
-    {Value = yAxis})
-    :Play()
-
-    TS:Create(currentCameraOffset,
-    TweenInfo.new(deltaTime, Enum.EasingStyle.Quint, Enum.EasingDirection.In, 0, false, 0),
-    {Value = mostRecentCameraOffset})
-    :Play()
-
-    local finalCameraCFrame = cameraRotationCFrame * CFrame.new(mostRecentCameraOffset--[[currentCameraOffset.Value]])
+    local finalCameraCFrame = cameraRotationCFrame * CFrame.new(mostRecentCameraOffset)
     camera.CFrame = finalCameraCFrame
 end
 
 
-local function FocusCamera(_, inputState, _)
-    if inputState == Enum.UserInputState.Begin then
-        camera.CameraType = Enum.CameraType.Scriptable
-        UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
 
-        CAS:UnbindAction('Focus')
-    end
-end
 
-CAS:BindAction('Focus', FocusCamera, false, Enum.UserInputType.MouseButton1, Enum.UserInputType.Touch, Enum.UserInputType.Focus)
+function CameraOffsetRaycast()
+    CameraRotationPart.CFrame =
+    CFrame.new(CameraRotationPart.CFrame.Position) *
+    CFrame.Angles(0, math.rad(xAxis), 0) *
+    CFrame.Angles(math.rad(yAxis), 0, 0)
 
-CAS:BindAction('Camera', CustomCamera, false, Enum.UserInputType.MouseMovement)
+    gizmo.setColor(Color3.fromRGB(255, 75, 216))
+    gizmo.setColor(Color3.fromRGB(0, 255, 0))
+    gizmo.drawSphere(CameraRotationPart.CFrame * CFrame.new(CameraRotationPart.CFrame.LookVector*3), .5)
 
-RS:BindToRenderStep('CameraMovement', Enum.RenderPriority.Camera.Value, RenderCamera)
-
-function CameraOffsetRaycast() : Vector3
     local computedVector = Vector3.zero
 
-    local cameraLookVector = cameraRotationCFrame.LookVector
-    local raycastOrigin = hrp.CFrame.Position --+ (cameraLookVector:Cross(Vector3.new(0,1,0)) * .21)
+    local cameraLookVector = CameraRotationPart.CFrame.LookVector
+    local raycastOrigin = CameraRotationPart.CFrame.Position
     local rcp = RaycastParams.new()
     rcp.FilterType = Enum.RaycastFilterType.Exclude
-    rcp.FilterDescendantsInstances = {character}
+    rcp.FilterDescendantsInstances = {FakeHrp, CameraRotationPart}
 
     local topOffset = (targetCameraOffset.Y * camera.CFrame.UpVector)
     local topResult = workspace:Raycast(raycastOrigin, topOffset, rcp)
@@ -91,7 +120,7 @@ function CameraOffsetRaycast() : Vector3
         local yVectorLength = (topResult.Position - raycastOrigin).Magnitude
         computedVector = Vector3.new(computedVector.X, yVectorLength, computedVector.Z)
     end
-    --gizmo.drawArrow(raycastOrigin, raycastOrigin + topOffset * (computedVector.Y/targetCameraOffset.Y))
+    gizmo.drawArrow(raycastOrigin, raycastOrigin + topOffset * (computedVector.Y/targetCameraOffset.Y))
     raycastOrigin = raycastOrigin + (topOffset * (computedVector.Y/targetCameraOffset.Y))
 
     local sideOffset = (cameraLookVector:Cross(Vector3.new(0,1,0))) * targetCameraOffset.X
@@ -149,3 +178,6 @@ function CameraOffsetRaycast() : Vector3
 
     return computedVector
 end
+
+
+RS:BindToRenderStep('TestRender', 500, CameraOffsetRaycast)

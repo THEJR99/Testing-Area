@@ -22,7 +22,7 @@ local RunService = game:GetService("RunService")
 local Event = RunService:IsServer() and RunService.Heartbeat or RunService.RenderStepped
 local Gizmos = Instance.new("Folder", workspace)
 
-local thickness = script:GetAttribute("DefaultThickness") or .01
+local thickness = script:GetAttribute("DefaultThickness") or .05
 local globalScale = script:GetAttribute("DefaultScale") or 1
 local globalOrigin = CFrame.new(0, 0, 0)
 local onRender = nil
