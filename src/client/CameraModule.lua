@@ -21,28 +21,44 @@ local _InternalProperties = {
     CurrentCameraMode = '';
 }
 
-function Module:SetCameraType(input: string)
+local CamearTypesStart = {
+    Default = StartDefaultCamera();
+    Survivor = StartSurvivorCamera();
+}
+
+local CameraTypesStop = {
+    Default = StopDefaultCamear();
+    Survivor = StartSurvivorCamera();
+}
+
+function Module:DisableCurrentCamera()
     local currentMode = _InternalProperties.CurrentCameraMode
-    if input == currentMode then
-        warn('Camera is already on ' .. input .. ' mode.')
-        return
-    end
+    local StopFunction = CameraTypesStop[currentMode]
 
-    if input == 'Default' then
-        StartDefaultCamera()
-    elseif input == 'Survivor' then
-        StartSurvivorCamera()
-
-    elseif input == 'Killer' then
-        warn('Work in progress!')
-
-    else
-        warn('Invalid Input: ' .. input)
-        return
-    end
-
-    _InternalProperties.CurrentCameraMode = input
+    StopFunction()
+    _InternalProperties.CurrentCameraMode = ""
 end
+
+function Module:SetCameraType(type: string)
+    local currentMode = _InternalProperties.CurrentCameraMode
+    if type == currentMode then
+        warn('Camera type is already: ' .. type)
+        return
+    end
+
+    for index, startFunction in pairs(CamearTypesStart) do
+        if type == index then
+            _InternalProperties.CurrentCameraMode = type
+            print('Switching type to: ' .. type)
+            startFunction()
+            return
+        end
+    end
+    warn('Invalid Input: ' .. type)
+end
+
+
+-- Camera Type Functions --
 
 function StartDefaultCamera()
     local camera = workspace.CurrentCamera
@@ -51,17 +67,24 @@ function StartDefaultCamera()
     UIS.MouseBehavior = Enum.MouseBehavior.Default
 end
 
+function StopDefaultCamear()
+    local camera = workspace.CurrentCamera
+
+    camera.CameraType = Enum.CameraType.Fixed
+end
+
+
 function StartSurvivorCamera()
     local camera = workspace.CurrentCamera
 
     CAS:BindAction('CameraInput', CaptureCameraInput, false, Enum.UserInputType.MouseMovement)
-    RS:BindToRenderStep('RenderCamera', Enum.RenderPriority.Camera.Value + 1, RenderCamera)
+    RS:BindToRenderStep('RenderCamera', Enum.RenderPriority.Camera.Value + 1, RenderSurvivorCamera)
 
     camera.CameraType = Enum.CameraType.Scriptable
     UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
 end
 
-function Module:DisableSurvivorCamera()
+function StopSurvivorCamera()
     local camera = workspace.CurrentCamera
 
     CAS:UnbindAction('CameraInput')
@@ -69,6 +92,7 @@ function Module:DisableSurvivorCamera()
     camera.CameraType = Enum.CameraType.Scriptable
     UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
 end
+
 
 function CameraOffsetRaycast() : Vector3
     local character = workspace:WaitForChild(game.Players.LocalPlayer.Name)
@@ -149,12 +173,15 @@ function CameraOffsetRaycast() : Vector3
     return computedVector
 end
 
-function RenderCamera(deltaTime)
+function RenderSurvivorCamera(deltaTime)
     local humanoidRootPart = workspace:WaitForChild(game.Players.LocalPlayer.Name):WaitForChild('HumanoidRootPart')
     local camera = workspace.CurrentCamera
     local rootPosition = humanoidRootPart.CFrame.Position
 
-    _InternalProperties.CameraRotationCFrame = CFrame.new(rootPosition) * CFrame.Angles(0, math.rad(xValue.Value), 0) * CFrame.Angles(math.rad(yValue.Value), 0, 0)
+    _InternalProperties.CameraRotationCFrame = CFrame.new(rootPosition) *
+    CFrame.Angles(0, math.rad(_InternalProperties.SmoothedInput.X.Value), 0) *
+    CFrame.Angles(math.rad(_InternalProperties.SmoothedInput.Y.Value), 0, 0)
+
     local newCameraOffset = CameraOffsetRaycast()
 
     TS:Create(_InternalProperties.SmoothedInput.X,

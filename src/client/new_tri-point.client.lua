@@ -122,12 +122,16 @@ function CameraOffsetRaycast() : Vector3
 
     local rightClipResult = workspace:Raycast(hrp.CFrame.Position, rightLookVector * rightDistance, rcp)
     if rightClipResult then
-        print('Right')
+        --print('Right')
         local clipDistance = (raycastOriginPostBack - rightClipResult.Position).Magnitude
         --gizmo.drawArrow(raycastOriginPostBack, rightClipResult.Position)
-        local yOffset = computedVector.X - clipDistance
+        local totalClip = computedVector.X - clipDistance
+        --print('Total Clip: ' .. clipDistance)
         local zOffset = computedVector.Z - (.1/clipDistance)
-        computedVector = Vector3.new(yOffset, computedVector.Y, zOffset)
+        computedVector = Vector3.new(computedVector.X, computedVector.Y, computedVector.Z - totalClip)
+
+        local rightCrossed = computedVector:Cross(Vector3.new(0,1,0) * (clipDistance/.21))
+        print(rightCrossed)
 
         return computedVector
     end

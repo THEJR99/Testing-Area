@@ -101,7 +101,6 @@ function CameraOffsetRaycast()
     CFrame.Angles(math.rad(yAxis), 0, 0)
 
     gizmo.setColor(Color3.fromRGB(255, 75, 216))
-    gizmo.setColor(Color3.fromRGB(0, 255, 0))
     gizmo.drawSphere(CameraRotationPart.CFrame * CFrame.new(CameraRotationPart.CFrame.LookVector*3), .5)
 
     local computedVector = Vector3.zero
@@ -112,7 +111,7 @@ function CameraOffsetRaycast()
     rcp.FilterType = Enum.RaycastFilterType.Exclude
     rcp.FilterDescendantsInstances = {FakeHrp, CameraRotationPart}
 
-    local topOffset = (targetCameraOffset.Y * camera.CFrame.UpVector)
+    local topOffset = (targetCameraOffset.Y * CameraRotationPart.CFrame.UpVector)
     local topResult = workspace:Raycast(raycastOrigin, topOffset, rcp)
     if not topResult then
         computedVector = Vector3.new(computedVector.X, targetCameraOffset.Y, computedVector.Z)
@@ -120,8 +119,11 @@ function CameraOffsetRaycast()
         local yVectorLength = (topResult.Position - raycastOrigin).Magnitude
         computedVector = Vector3.new(computedVector.X, yVectorLength, computedVector.Z)
     end
+    gizmo.setColor(Color3.fromRGB(0, 255, 0))
     gizmo.drawArrow(raycastOrigin, raycastOrigin + topOffset * (computedVector.Y/targetCameraOffset.Y))
     raycastOrigin = raycastOrigin + (topOffset * (computedVector.Y/targetCameraOffset.Y))
+    gizmo.setColor(Color3.fromRGB(0, 150, 0))
+    gizmo.drawSphere(CFrame.new(raycastOrigin), .1)
 
     local sideOffset = (cameraLookVector:Cross(Vector3.new(0,1,0))) * targetCameraOffset.X
     local sideResult = workspace:Raycast(raycastOrigin, sideOffset, rcp)
@@ -131,8 +133,13 @@ function CameraOffsetRaycast()
         local xVectorLength = (sideResult.Position - raycastOrigin).Magnitude
         computedVector = Vector3.new(xVectorLength, computedVector.Y, computedVector.Z)
     end
+    local sidePostCalc = raycastOrigin + (sideOffset * (computedVector.X/targetCameraOffset.X))
+    gizmo.setColor(Color3.fromRGB(255, 0, 0))
+    gizmo.drawArrow(raycastOrigin, sidePostCalc)
+    raycastOrigin = sidePostCalc
+    gizmo.setColor(Color3.fromRGB(150, 0, 0))
+    gizmo.drawSphere(CFrame.new(raycastOrigin), .1)
     --gizmo.drawArrow(raycastOrigin, raycastOrigin + sideOffset * (computedVector.X/targetCameraOffset.X))
-    raycastOrigin = raycastOrigin + (sideOffset * (computedVector.X/targetCameraOffset.X))
 
     local backOffset = (targetCameraOffset.Z * -cameraLookVector)
     local backResult = workspace:Raycast(raycastOrigin, backOffset, rcp)
@@ -151,7 +158,7 @@ function CameraOffsetRaycast()
 
     local rightClipResult = workspace:Raycast(hrp.CFrame.Position, rightLookVector * rightDistance, rcp)
     if rightClipResult then
-        print('Right')
+        --print('Right')
         local clipDistance = (raycastOriginPostBack - rightClipResult.Position).Magnitude
         --gizmo.drawArrow(raycastOriginPostBack, rightClipResult.Position)
         local yOffset = computedVector.X - clipDistance
@@ -168,7 +175,7 @@ function CameraOffsetRaycast()
 
     local leftClipResult = workspace:Raycast(hrp.CFrame.Position, leftLookVector * leftDistance, rcp)
     if leftClipResult then
-        print('Left')
+        --print('Left')
         local clipDistance = (raycastOriginPostBack - leftClipResult.Position).Magnitude
         computedVector = Vector3.new((computedVector.X + clipDistance), computedVector.Y, computedVector.Z)
 
